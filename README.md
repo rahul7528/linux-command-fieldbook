@@ -6,7 +6,7 @@ This repo is not a list of commands. It's a map of **how to operate a Linux mach
 
 ---
 
-## What is Linux — in one paragraph
+## What is Linux?
 
 Before Windows had a Start menu (1995) or Mac had a Dock, computers were just a black screen and a shell.
 
@@ -40,9 +40,51 @@ Because production servers don't have a mouse.
 4. **Visibility:** `ls -l` shows permissions, owner, size. Properties window hides it.
 
 
+## Linux Architecture — Explained Like a Human Body
+
+Linux works in 5 layers, from bottom to top. Think of your computer like a person:
+
+
+HARDWARE ← The body (CPU, RAM, Disk, Keyboard)
+↓
+KERNEL ← The brain (Linux)
+↓
+SYSTEM LIBRARIES ← Common tools (toolbox)
+↓
+SHELL ← Your voice (bash)
+↓
+USER APPS ← What you use (Chrome, VS Code, ls, nginx)
+
+
+### 1. HARDWARE — The Body
+The physical stuff. CPU, RAM, hard disk. Does nothing alone — like a body without a brain.
+**Example:** Your hard disk is a cupboard. It can't open itself.
+
+### 2. KERNEL — The Brain
+The Linux program that controls everything. Decides who uses CPU, gives memory, reads/writes disk, sends network.
+**Example:** When you save a file, the kernel is the one who actually writes 1s and 0s to disk.
+
+### 3. SYSTEM LIBRARIES — The Toolbox
+Ready-made tools (main one is `glibc`). So apps don't have to learn brain-language.
+**Example:** Every app uses `open()` to open files — like using the same screwdriver instead of making your own.
+
+### 4. SHELL — Your Voice
+`bash` — the black screen where you type. Translates your words into instructions.
+**Example:** You type `mkdir photos`. Shell hears it and passes it up.
+
+### 5. USER APPLICATIONS — Your Hands
+Programs you run — `ls`, `chrome`, `python`. They do the actual work.
+**Example:** `ls` just asks "show me files".
+
+**Memory trick:** Hardware → Brain → Nerves → Voice → Hands
+
+
+---
+
+
 ## THE 4 PILLARS — How this repo is organized
 
-### 1. 01-navigation-and-manipulation
+### 1. Navigation-and-Manipulation
 **Everything about moving around the system without a mouse.**
 
 Goal: Never get lost in the filesystem.
@@ -57,7 +99,7 @@ You'll learn:
 
 > CLI vs GUI: Right-click → New Folder vs `mkdir -p project/{src,tests}`
 
-### 2. 02-system-observability
+### 2. System-Observability
 **Everything related to `top`, `df`, `free`, `tail -f`, `dmesg`**
 
 Goal: Understanding why the application is crashing or slow.
@@ -70,7 +112,7 @@ You'll learn:
 
 **Real scenario:** App is slow. You run `top` → see 1 process at 400% CPU, `df -h` → disk at 100%, `tail -f` → logs filling disk. Fix in 3 commands.
 
-### 3. 03-networking-and-security
+### 3. Networking-and-Security
 **Securing the blast radius and ensuring services can talk to each other.**
 
 Goal: Connect to machines, move files, lock them down.
@@ -83,7 +125,7 @@ You'll learn:
 
 **Real scenario:** You can't reach the API. `ss -tulnp` shows nothing on port 8080, `curl localhost:8080` fails, `chmod +x` fixes the startup script.
 
-### 4. 04-automation
+### 4. Automation
 **Never doing the same task twice.**
 
 Goal: Turn commands into systems.
