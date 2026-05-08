@@ -20,7 +20,7 @@ Before Windows had a Start menu (1995) or Mac had a Dock, computers were just a 
 Windows hides this behind Explorer. Linux gives you the steering wheel.
 
 
-## Shell vs Bash — stop confusing them
+## Shell vs Bash
 
 | | What it is |
 |---|---|
@@ -137,3 +137,8 @@ You'll learn:
 - **Environment:** `export`, `env`, `printenv`, `$PATH`, `.bashrc`, `.profile`, `alias`, `unalias`
 
 **Real scenario:** Instead of manually compressing logs daily, you write a 10-line script + cron that rotates, gzips, and uploads to S3 every night.
+
+
+## How to read a command
+
+Every page in this repo follows the same format:
