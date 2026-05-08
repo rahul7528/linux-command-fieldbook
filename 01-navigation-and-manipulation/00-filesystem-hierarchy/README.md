@@ -7,13 +7,15 @@
 Every project you build looks like this:
 
 
+```
 project/
-├── config/ # where settings live
-├── logs/ # where errors are written
-├── scripts/ # tools you run
-├── backups/ # copies you keep
-├── data/ # database and uploads
-└── src/ # your actual code
+├── config/      # where settings live
+├── logs/        # where errors are written
+├── scripts/     # tools you run
+├── backups/     # copies you keep
+├── data/        # database and uploads
+└── src/         # your actual code
+```
 
 
 You already separate things by purpose. Linux does the exact same thing for the whole computer.
