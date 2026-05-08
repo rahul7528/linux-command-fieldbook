@@ -6,18 +6,13 @@
 
 Every project you build looks like this:
 
+
 project/
-
 ├── config/ # where settings live
-
 ├── logs/ # where errors are written
-
 ├── scripts/ # tools you run
-
 ├── backups/ # copies you keep
-
 ├── data/ # database and uploads
-
 └── src/ # your actual code
 
 
@@ -107,6 +102,7 @@ USB drives and extra hard disks appear here after you mount them.
 Libraries that programs need to run. Like DLL files in Windows.
 - Try: `ls /lib` - do not delete anything here
 
+---
 
 ## Three Ways to Explore
 
@@ -123,6 +119,7 @@ Libraries that programs need to run. Like DLL files in Windows.
 - Try: `find /etc -name "*.conf"` - finds all config files in /etc
 - The `| head` at the end just shows first 10 results so screen does not flood
 
+---
 
 ## Real Problems You Will Face
 
@@ -145,7 +142,7 @@ All settings are in /etc. If you want to change SSH port, you edit the SSH confi
 - `cat /etc/ssh/sshd_config` - cat shows the file contents
 - This file controls how SSH works
 
-
+---
 
 ## What to Remember
 
