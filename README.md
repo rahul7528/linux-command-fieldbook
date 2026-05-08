@@ -141,4 +141,10 @@ You'll learn:
 
 ## How to read a command
 
-Every page in this repo follows the same format:
+Open any folder — every lesson follows the same 4-part structure inside.
+
+
+---
+⭐ **If this helped you understand Linux better than a 2-hour video, star the repo.** It helps others find it.
+
+Built by [@rahul7528](https://github.com/rahul7528) — learning in public.
