@@ -1,106 +1,84 @@
 #!/bin/bash
-# 02 - Files and Folders - All commands demo
-# Run: bash commands.sh
+# 02 - Files and Folders - Demo
+cd /tmp
+rm -rf files-demo
+mkdir files-demo
+cd files-demo
 
 echo "=========================================="
 echo "FILES AND FOLDERS - LIVE DEMO"
 echo "=========================================="
-cd /tmp
-rm -rf demo-files
-mkdir demo-files
-cd demo-files
+pause() { read -p "--- Press Enter ---"; }
 
-pause() { echo ""; echo "--- Press Enter ---"; read; }
-
-echo ">>> 1. mkdir projects"
-mkdir projects
-ls -ld projects
+echo ">>> 1. mkdir -p"
+mkdir -p project/src/tests
+tree project 2>/dev/null || find project
 pause
 
-echo ">>> 2. mkdir -p projects/linux/logs"
-mkdir -p projects/linux/logs
-tree projects 2>/dev/null || find projects
+echo ">>> 2. touch multiple"
+touch file1.txt file2.txt file3.txt
+ls
 pause
 
-echo ">>> 3. touch file1.txt file2.txt"
-touch file1.txt file2.txt
-ls -lh
-pause
-
-echo ">>> 4. touch file1.txt (updates time)"
-sleep 1
-touch file1.txt
-ls -lt
-pause
-
-echo ">>> 5. cp file1.txt backup.txt"
+echo ">>> 3. cp"
 cp file1.txt backup.txt
+cp -v file2.txt file2-copy.txt
+pause
+
+echo ">>> 4. cp -r"
+cp -r project project-backup
 ls
 pause
 
-echo ">>> 6. cp -v file2.txt /tmp/"
-cp -v file2.txt /tmp/
-pause
-
-echo ">>> 7. cp -r projects projects-backup"
-cp -r projects projects-backup
-ls -d projects*
-pause
-
-echo ">>> 8. cp -iv file1.txt backup.txt (will ask)"
-cp -iv file1.txt backup.txt
-pause
-
-echo ">>> 9. mv backup.txt renamed.txt"
-mv backup.txt renamed.txt
+echo ">>> 5. mv rename"
+mv file3.txt renamed.txt
 ls
 pause
 
-echo ">>> 10. mv renamed.txt projects/"
-mv renamed.txt projects/
-ls projects/
-pause
-
-echo ">>> 11. mv -v file2.txt file2-moved.txt"
-mv -v file2.txt file2-moved.txt
-pause
-
-echo ">>> 12. cp -a projects projects-archive"
-cp -a projects projects-archive
-ls -ld projects*
-pause
-
-echo ">>> 13. rmdir (fails on non-empty)"
-mkdir empty
-rmdir empty
-echo "empty deleted"
-mkdir nonempty
-touch nonempty/x
-rmdir nonempty 2>&1 || echo "rmdir refused - folder not empty"
-pause
-
-echo ">>> 14. rm file2-moved.txt"
-rm file2-moved.txt
+echo ">>> 6. rm multiple with wildcard"
+touch a.tmp b.tmp c.log
+rm *.tmp
 ls
 pause
 
-echo ">>> 15. rm -ri projects-backup (interactive)"
-rm -ri projects-backup
-pause
-
-echo ">>> 16. rm -rf projects-archive (force)"
-rm -rf projects-archive
+echo ">>> 7. rm with prefix/suffix"
+touch backup-1.txt backup-2.txt test-old.log
+rm backup-*
+rm *-old.log
 ls
 pause
 
-echo ">>> 17. Safety demo: install with permissions"
-echo "#!/bin/bash" > script.sh
-install -m 755 script.sh /tmp/myscript
-ls -l /tmp/myscript
+echo ">>> 8. rm with brace"
+touch file1.txt file2.txt file3.txt
+rm file{1..3}.txt
+ls
 pause
 
-echo ""
-echo "Demo complete. Cleaning /tmp/demo-files"
+echo ">>> 9. rmdir"
+mkdir empty1 empty2
+rmdir empty1
+ls
+pause
+
+echo ">>> 10. Loop with cp"
+touch img1.jpg img2.jpg
+mkdir images
+for f in *.jpg; do cp "$f" images/; done
+ls images
+pause
+
+echo ">>> 11. Loop with mv and prefix"
+for f in *.jpg; do mv "$f" "old-$f"; done
+ls
+pause
+
+echo ">>> 12. Remove empty dirs with find"
+mkdir -p a/b/c
+find . -type d -empty -delete
+find .
+pause
+
+echo "Cleanup"
 cd /tmp
-rm -rf demo-files
-echo "Done."
+rm -rf files-demo
+echo "Demo complete."

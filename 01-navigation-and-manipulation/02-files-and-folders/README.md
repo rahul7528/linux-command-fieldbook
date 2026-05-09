@@ -1,241 +1,242 @@
 ## 02 - Files and Folders
 
-> Creating, copying, moving, deleting. These are the commands you will use 100 times a day. Learn them right and you won't delete production.
+> Create, copy, move, delete. Master these and you control 80% of daily Linux work.
 
-## Start With What You Know
+## 1. Creating
 
-In Windows:
-- Right-click > New Folder = mkdir
-- Right-click > New Text File = touch
-- Ctrl+C, Ctrl+V = cp
-- Drag and drop = mv
-- Delete key = rm
-
-Linux does the same, but with text commands that work on servers without a mouse.
-
-## The 5 Core Commands
-
-### 1. `mkdir` - Make Directory
-
-Create folders.
-
+### `mkdir` - make directory
 ```bash
-mkdir projects
+mkdir project
+mkdir -p project/src/project/tests
 ```
+-p creates parent folders, no error if exists.
 
-**Create nested folders in one go:**
-```bash
-mkdir -p projects/linux/logs
-```
-**Why -p matters:** Without -p, mkdir fails if parent doesn't exist. With -p, it creates the whole path. Always use -p in scripts.
-
-**Output:** No output if successful. Verify with `ls`.
-
----
-
-### 2. `touch` - Create empty file or update time
-
+### `touch` - create empty file or update time
 ```bash
 touch notes.txt
-```
-
-**What it really does:** Creates file if missing, updates last-modified time if exists.
-
-**Create multiple:**
-```bash
 touch file1.txt file2.txt file3.txt
+touch -t 202401011200 oldfile.txt   # set specific time
 ```
-
-**Why use it:** Quick way to create placeholder files for testing. Also used to "touch" a file to make backup tools think it's new.
 
 ---
 
-### 3. `cp` - Copy
+## 2. Copying
 
-**Copy file:**
+### `cp` - copy files
 ```bash
-cp notes.txt notes-backup.txt
+cp file.txt backup/
+cp file.txt backup/copy.txt
 ```
 
-**Copy to folder:**
+**Copy folder:**
 ```bash
-cp notes.txt /tmp/
+cp -r project/ backup/
 ```
 
-**Copy folder (needs -r):**
+**Preserve everything:**
 ```bash
-cp -r projects projects-backup
+cp -a project/ backup/
 ```
-**Why -r:** r = recursive. Copies folder and everything inside. Without -r, cp fails on directories.
+-a = archive, keeps permissions, times, symlinks
 
-**Safe copy flags you should always use:**
+**Interactive (ask before overwrite):**
 ```bash
-cp -iv notes.txt /backup/
-```
-- `-i` = interactive, asks before overwriting
-- `-v` = verbose, shows what it's doing
-
-**Output with -v:**
-```
-'notes.txt' -> '/backup/notes.txt'
+cp -i file.txt dest/
 ```
 
-**Update only newer files:**
+**Verbose:**
 ```bash
-cp -u *.log /backup/
+cp -v *.txt /tmp/
 ```
--u copies only if source is newer. Perfect for backups.
 
 ---
 
-### 4. `mv` - Move or Rename
+## 3. Moving and Renaming
 
-Same command does both.
+`mv` does both.
 
-**Rename:**
 ```bash
-mv oldname.txt newname.txt
+mv old.txt new.txt          # rename
+mv file.txt /tmp/           # move
+mv -i file.txt /tmp/        # ask before overwrite
 ```
 
-**Move:**
+**Move multiple:**
 ```bash
-mv newname.txt /tmp/
+mv *.log logs/
 ```
-
-**Move multiple to folder:**
-```bash
-mv file1.txt file2.txt projects/
-```
-
-**Safe move:**
-```bash
-mv -i important.txt /backup/
-```
--i asks before overwriting. Use this always for important files.
-
-**Why mv is instant:** It doesn't copy data, just changes the directory entry. Even 10GB files move instantly on same disk.
 
 ---
 
-### 5. `rm` - Remove (Delete)
+## 4. Deleting
 
-**Delete file:**
+### `rm` - remove files
 ```bash
-rm notes.txt
+rm file.txt
+rm -i file.txt              # confirm
+rm -f file.txt              # force, no error if missing
 ```
 
-**Delete folder and everything inside:**
+**Delete multiple at once:**
 ```bash
-rm -r projects/
+rm file1.txt file2.txt file3.txt
+rm *.tmp *.bak
 ```
--r = recursive. Required for folders.
 
-**Force delete without asking:**
+**With prefix and suffix:**
 ```bash
-rm -rf /tmp/old-data
+rm backup-*                 # all starting with backup-
+rm *-old.log                # all ending with -old.log
+rm *2024*.txt               # contains 2024
 ```
-**DANGER:** -f = force, never asks. rm -rf is the command that deletes production. Never type rm -rf / or rm -rf ~ by mistake.
 
-**Safe delete:**
+**With brace expansion:**
 ```bash
-rm -i *.txt
+rm file{1,2,3}.txt
+rm log-{jan,feb,mar}.txt
 ```
--i asks for each file. Use when unsure.
 
-**Empty folder only:**
+**Recursive delete folder:**
 ```bash
-rmdir empty-folder
+rm -r folder/
+rm -rf folder/              # force, dangerous
 ```
-rmdir only works if folder is empty. Safer than rm -r.
+
+### `rmdir` - remove empty directory
+```bash
+rmdir empty_folder/
+```
+Fails if not empty. Safer than rm -r.
+
+**Remove empty dirs recursively:**
+```bash
+find . -type d -empty -delete
+```
 
 ---
 
-## Pro Moves
+## 5. Loops with cp and mv - Bulk Operations
 
-### 1. `cp -a` - Archive copy (preserves everything)
+When wildcards aren't enough, use loops.
+
+**Copy all jpg files to backup:**
 ```bash
-cp -a /etc/nginx /backup/nginx-2024-05-09
+for f in *.jpg; do cp "$f" /backup/images/; done
 ```
--a = archive. Keeps permissions, timestamps, symlinks. Use for backups.
 
-### 2. `mv` with backup
+**Move and add prefix:**
 ```bash
-mv --backup=numbered config.conf config.conf.new
+for f in *.txt; do mv "$f" "archive-$f"; done
 ```
-Creates config.conf.~1~ automatically. Never lose old version.
 
-### 3. `install` - Copy with permissions
+**Copy with renaming:**
+```bash
+for f in *.txt; do cp "$f" "/backup/${f%.txt}.bak"; done
+```
+${f%.txt} removes .txt suffix
+
+**Move files by date (using find):**
+```bash
+for f in $(find . -name "*.log" -mtime +30); do
+  mv "$f" /archive/
+done
+```
+
+**Safe loop (handles spaces):**
+```bash
+find . -name "*.mp4" -print0 | while IFS= read -r -d '' f; do
+  cp "$f" /videos/
+done
+```
+
+---
+
+## 6. Advanced Copy/Move
+
+**Copy and preserve:**
+```bash
+cp -av source/ dest/
+```
+
+**Copy only newer files:**
+```bash
+cp -u *.txt /backup/
+```
+
+**Move with target directory first:**
+```bash
+mv -t /dest/ file1 file2 file3
+```
+
+**Install (copy with permissions):**
 ```bash
 install -m 755 script.sh /usr/local/bin/
 ```
-Copies and sets executable permission in one command. Better than cp + chmod.
-
-### 4. Check before deleting
-```bash
-ls -lh /tmp/old-data
-du -sh /tmp/old-data
-rm -ri /tmp/old-data
-```
-Always ls and du first. -i makes rm ask each time.
 
 ---
 
-## Real Problems You Will Face
+## 7. Safety Tips
 
-**Problem 1: "I need same folder structure on 10 servers"**
+**Always test with echo first:**
 ```bash
-mkdir -p /opt/app/{logs,config,data}
+echo rm *.tmp
+# shows what would be deleted
+rm *.tmp
 ```
-Creates three subfolders in one command. Braces expand.
 
-**Problem 2: "I copied but permissions broke"**
+**Use -i when unsure:**
 ```bash
-cp -a source/ dest/
+rm -i *
 ```
-Use -a not -r for configs and scripts. Preserves executable bit.
 
-**Problem 3: "I accidentally overwrote file"**
-Prevention:
-```bash
-alias cp='cp -i'
-alias mv='mv -i'
-```
-Add to ~/.bashrc. Now cp and mv always ask.
+**Never `rm -rf /` or `rm -rf ~`**
 
-**Problem 4: "How to delete everything except one file?"**
+**Check before recursive:**
 ```bash
-ls | grep -v keep.txt | xargs rm
+ls folder/
+rm -r folder/
 ```
-Or safer: move keep.txt away, rm -r *, move back.
-
-**Problem 5: "rm -rf stuck, is it working?"**
-```bash
-rm -rv /big-folder
-```
--v shows each file as deleted. You see progress.
 
 ---
 
-## Safety Rules
+## Real Examples
 
-1. Never run rm -rf as root unless you typed the path twice
-2. Always use `ls` on the path first
-3. Use `rm -i` for important folders
-4. For scripts, use `rm -rf "$VAR"/` with quotes, never `rm -rf $VAR/`
-5. Test with `echo rm -rf /path` first
+**Backup today's work:**
+```bash
+mkdir -p backup/$(date +%F)
+cp -av project/* backup/$(date +%F)/
+```
+
+**Clean downloads:**
+```bash
+cd ~/Downloads
+rm *.tmp *.part
+for f in *\ *; do mv "$f" "${f// /_}"; done   # replace spaces
+```
+
+**Archive old files:**
+```bash
+for f in *.log; do
+  if [ $(stat -c %Y "$f") -lt $(date -d "30 days ago" +%s) ]; then
+    mv "$f" archive/
+  fi
+done
+```
+
+**Remove all empty folders:**
+```bash
+find . -type d -empty -delete
+```
 
 ---
 
 ## What to Remember
 
-- `mkdir -p` creates full path
-- `cp -r` for folders, `cp -iv` for safety
-- `mv` renames instantly
-- `rm -r` deletes folders, `rm -rf` is dangerous
-- `rmdir` only for empty folders
-- Always ls before rm
-
-Master these and you can build and clean any project structure.
-
----
-Next: 03 - Viewing and Editing Files (cat, less, head, tail, nano)
+- mkdir -p creates full path
+- cp -a preserves everything, cp -r for simple copy
+- mv renames and moves
+- rm with wildcards, brace, prefix/suffix for bulk delete
+- rmdir only removes empty, safer
+- Use for loops for complex bulk cp/mv
+- Always quote "$f" in loops to handle spaces
+- Test with echo or ls before destructive commands
