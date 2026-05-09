@@ -1,4 +1,4 @@
-# 00 - Filesystem Hierarchy - Complete Command Reference
+# 00 - Filesystem Hierarchy - Complete Command Reference book
 
 This is your master cheat sheet. Every command from the README, what it does, what output looks like, and what to say if someone asks.
 
