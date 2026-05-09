@@ -1,236 +1,121 @@
 ## 04 - Wildcards and Globbing
 
-> Stop typing every filename. Let the shell expand patterns for you. This is how you work with 1000 files in one command.
+> Type less, do more. Wildcards let you select dozens of files with 3 characters.
 
-## Start With What You Know
+## The Big Four
 
-In Windows search you type `*.txt` to find all text files.
-
-Linux shell does the same, but before the command runs. The shell expands `*.txt` into a list of real files, then passes that list to the command.
-
-## The 4 Basic Wildcards
-
-### 1. `*` - Match anything (zero or more characters)
-
+### `*` - Anything (including nothing)
 ```bash
-ls *.log
-```
-Matches: app.log, error.log, 1.log — anything ending .log
-
-```bash
-rm *.tmp
-```
-Deletes all .tmp files in current folder.
-
-**Important:** `*` does NOT match hidden files starting with `.` unless you type `.*`
-
-### 2. `?` - Match exactly one character
-
-```bash
-ls file?.txt
-```
-Matches: file1.txt, fileA.txt — but NOT file10.txt (that's two chars)
-
-```bash
-ls ?.log
-```
-Matches: a.log, 1.log — single character names only
-
-### 3. `[abc]` - Match one character from set
-
-```bash
-ls file[123].txt
-```
-Matches: file1.txt, file2.txt, file3.txt
-
-```bash
-ls [aeiou]*.txt
-```
-Matches files starting with a vowel
-
-**Ranges:**
-```bash
-ls file[0-9].txt   # file0 to file9
-ls file[a-z].txt   # lowercase letter
-ls file[A-Z].txt   # uppercase
+ls *.txt              # all txt files
+ls file*              # file, file1, file_backup
+ls *2024*             # anything containing 2024
 ```
 
-### 4. `[!abc]` or `[^abc]` - NOT in set
-
+**Delete by suffix:**
 ```bash
-ls file[!0-9].txt
+rm *.log              # all ending .log
+rm *-old.log          # all ending -old.log
 ```
-Matches fileA.txt but not file1.txt
+
+**Delete by prefix:**
+```bash
+rm backup-*           # all starting with backup-
+rm temp-*             # all starting with temp-
+```
+
+### `?` - Exactly one character
+```bash
+ls file?.txt          # file1.txt, fileA.txt (not file10.txt)
+ls ???.log            # exactly 3 chars + .log
+```
+
+### `[]` - One of these characters
+```bash
+ls file[123].txt      # file1.txt, file2.txt, file3.txt
+ls file[1-5].txt      # file1 through file5
+ls file[a-z].txt      # filea through filez
+ls *[0-9].log         # ends with digit
+```
+
+### `{}` - Brace expansion (not a wildcard, but works like one)
+```bash
+ls file{1,2,3}.txt    # file1.txt file2.txt file3.txt
+ls {a,b,c}.log        # a.log b.log c.log
+rm file{1..10}.txt    # delete file1 through file10
+cp file.txt{,.bak}    # copy to file.txt.bak
+mkdir project-{src,tests,docs}
+```
 
 ---
 
-## Brace Expansion `{}` - Generate combinations
+## Real Combinations
 
-Not a wildcard, but shell expands it.
-
+**Multiple patterns:**
 ```bash
-echo file{1,2,3}.txt
-```
-**Output:** file1.txt file2.txt file3.txt
-
-**Create multiple folders:**
-```bash
-mkdir -p project/{src,tests,docs}
-```
-Creates three folders in one command.
-
-**Ranges with braces:**
-```bash
-touch log{01..10}.txt
-```
-Creates log01.txt through log10.txt
-
-**Combine:**
-```bash
-cp config.{bak,old}
-```
-Expands to: cp config.bak config.old
-
----
-
-## Real Examples You Will Use
-
-**Clean logs older than .1:**
-```bash
-rm *.log.1 *.log.2.gz
+ls *.txt *.md
+rm *.tmp *.bak *.log
 ```
 
-**Copy all images:**
+**Prefix and suffix together:**
 ```bash
-cp *.{jpg,png,gif} /backup/images/
+ls backup-*-2024.tar.gz
+rm log-*-error.txt
 ```
 
-**Find config files:**
-```bash
-ls /etc/*.{conf,cfg}
-```
-
-**Backup with date:**
-```bash
-cp app.log app.log.{$(date +%F)}
-```
-Creates app.log.2024-05-09
-
-**Match hidden files:**
-```bash
-ls .*
-```
-Shows .bashrc, .profile etc. Be careful, includes . and ..
-
-Better:
-```bash
-ls .[^.]*
-```
-Matches hidden files but not . and ..
-
----
-
-## Escaping - When you don't want expansion
-
-**Problem:** File literally named `*.txt`
-```bash
-rm "*.txt"    # quotes prevent expansion
-rm \*.txt     # backslash escapes *
-```
-
-**When to quote:**
-```bash
-find . -name "*.log"   # find needs the *, not shell
-```
-Without quotes, shell expands *.log first, find breaks.
-
----
-
-## Pro Patterns
-
-### 1. `**` - Recursive (needs globstar)
-```bash
-shopt -s globstar
-ls **/*.py
-```
-Finds all .py files in all subfolders.
-
-### 2. Match everything except
-```bash
-ls !(*.tmp)   # needs extglob
-```
-Shows all files except .tmp
-
-Enable:
+**Exclude with extglob (enable first):**
 ```bash
 shopt -s extglob
-```
-
-### 3. Case-insensitive
-```bash
-shopt -s nocaseglob
-ls *.JPG   # matches .jpg and .JPG
+ls !(*.txt)           # everything except txt
+rm !(*.sh|*.py)       # delete all except scripts
 ```
 
 ---
 
-## Common Mistakes
+## Safety with Wildcards
 
-**Mistake 1: `rm *` in wrong folder**
-Always `pwd` and `ls` first. Then `echo *` to see what will be deleted.
-
-**Mistake 2: Spaces in names**
+**Always test first:**
 ```bash
-rm My File.txt   # tries to delete My and File.txt
-rm "My File.txt" # correct
-rm My*.txt       # expands to My File.txt, still breaks
+echo rm *.tmp
+# shows what would be deleted
+ls *.tmp
+rm *.tmp
 ```
-Use quotes or escape: `rm My\ File.txt`
 
-**Mistake 3: Hidden files not matched**
-`*` doesn't match `.env`. Use `.*` or `shopt -s dotglob`
-
-**Mistake 4: No matches**
+**Quote to prevent expansion:**
 ```bash
-ls *.xyz
+echo "*"              # prints *
+echo *                # expands to files
 ```
-If no .xyz files, bash passes literal `*.xyz` to ls, which errors.
-Fix: `shopt -s nullglob` makes it expand to nothing.
+
+**Hidden files:**
+```bash
+ls *                  # doesn't show dotfiles
+ls .*                 # shows .hidden
+ls .[^.]*             # hidden but not . and ..
+```
 
 ---
 
-## Real Problems
+## Common Patterns
 
-**Problem 1: Delete 1000 log files except today's**
-```bash
-ls -t *.log | tail -n +2 | xargs rm
-```
-ls -t sorts newest first, tail skips first, xargs deletes rest.
-
-**Problem 2: Rename all .txt to .md**
-```bash
-for f in *.txt; do mv "$f" "${f%.txt}.md"; done
-```
-${f%.txt} removes .txt suffix.
-
-**Problem 3: Copy files with numbers 1-50**
-```bash
-cp file{[1-9],[1-4][0-9],50}.txt /dest/
-```
-Brace expansion handles ranges.
+| Pattern | Matches |
+|---------|---------|
+| `*.txt` | All txt files |
+| `file*` | Starts with file |
+| `*backup*` | Contains backup |
+| `?-test.log` | 1 char + -test.log |
+| `[abc]*.txt` | Starts a, b, or c |
+| `*.[ch]` | Ends .c or .h |
+| `file{1..5}.txt` | file1 to file5 |
 
 ---
 
 ## What to Remember
 
-- `*` = anything, `?` = one char, `[abc]` = one of these
-- `{}` generates names, doesn't match files
-- Shell expands before command runs
-- Quote patterns when passing to find, grep
-- Always `echo *.ext` before `rm *.ext`
-- `shopt -s globstar` for ** recursive
+- `*` = anything, `?` = one char, `[]` = one of set, `{}` = list
+- Test with `ls` or `echo` before `rm`
+- Prefix: `backup-*`, Suffix: `*-old`
+- Brace expansion is powerful for bulk operations
+- Quote wildcards when passing to commands like find
 
-Master globbing and you can manage thousands of files with one line.
-
----
-Next: 05 - Finding Files (find, locate)
+Wildcards turn 100 file operations into one command.

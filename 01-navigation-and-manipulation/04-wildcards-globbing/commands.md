@@ -1,133 +1,53 @@
-# 04 - Wildcards and Globbing - Command Reference
-
-Every pattern, what it matches, and sample output.
+# 04 - Wildcards - Quick Reference
 
 ---
 
-## * asterisk
-**Command:** `echo *.txt`
-**If files exist:** file1.txt file2.txt notes.txt
-**If none:** *.txt (literal)
-**Matches:** zero or more characters, except leading .
+## *
+`*.txt` → all txt
+`file*` → starts with file
+`*2024*` → contains 2024
+`*old.log` → ends with old.log
 
-**Examples:**
-- `ls *.log` → app.log error.log
-- `rm *~` → deletes backup files ending ~
-- `cp /var/log/* .` → copies all non-hidden files
-
-**Does not match:** .hidden (use `.*`)
+**Delete:**
+`rm *.log`
+`rm backup-*` → prefix
+`rm *-old` → suffix
 
 ---
 
-## ? question
-**Command:** `ls file?.txt`
-**Matches:** file1.txt, fileA.txt
-**Not:** file10.txt, file.txt
-
-**Use:** when you know exact length
+## ?
+`file?.txt` → file1.txt, fileA.txt
+`???.log` → exactly 3 chars
 
 ---
 
-## [set]
-**Command:** `ls [abc]*`
-**Matches:** apple.txt, banana.log, cherry
-**Not:** dog.txt
-
-**Ranges:**
-- `[0-9]` → any digit
-- `[a-z]` → lowercase
-- `[A-Z]` → uppercase
-- `[0-9a-f]` → hex digit
-
-**Command:** `ls file[1-3].txt`
-**Output:** file1.txt file2.txt file3.txt
+## []
+`[abc].txt` → a.txt, b.txt, c.txt
+`[1-5].txt` → 1-5
+`[a-z].txt` → a-z
+`[^0-9]*` → not starting with digit
 
 ---
 
-## [!set] negation
-**Command:** `ls file[!0-9].txt`
-**Matches:** fileA.txt file_.txt
-**Not:** file1.txt
+## {}
+`file{1,2,3}.txt` → file1 file2 file3
+`{a,b}.log` → a.log b.log
+`file{1..10}.txt` → 1 through 10
+`cp f.txt{,.bak}` → copy to f.txt.bak
 
-**Alternative:** `[^0-9]` same meaning
-
----
-
-## {} brace expansion
-**Not globbing** - generates strings before matching
-
-**Command:** `echo {a,b,c}.txt`
-**Output:** a.txt b.txt c.txt
-
-**Command:** `mkdir {src,bin,lib}`
-Creates three directories
-
-**Sequence:**
-- `{1..5}` → 1 2 3 4 5
-- `{01..10}` → 01 02 ... 10
-- `{a..e}` → a b c d e
-
-**Nested:**
-`{a,b}{1,2}` → a1 a2 b1 b2
+**Delete with brace:**
+`rm file{1..100}.tmp`
 
 ---
 
-## Combining
-**Command:** `ls *.[ch]`
-**Matches:** main.c main.h test.c
-**Meaning:** * then dot then c or h
-
-**Command:** `cp *.{jpg,JPG,png} images/`
-Copies all three extensions
+## Combinations
+`*.txt *.md` → multiple types
+`backup-*-2024*` → prefix + contains + suffix
+`ls !(*.sh)` → requires shopt -s extglob
 
 ---
 
-## Escaping
-**Literal asterisk file:**
-```bash
-touch '*.txt'
-ls \*.txt    # shows *.txt
-rm "*.txt"   # deletes it
-```
-
-**Pass to find:**
-```bash
-find . -name "*.log"   # quotes prevent shell expansion
-```
-Without quotes, shell expands first, find gets wrong args.
-
----
-
-## Advanced globs
-**Enable:** `shopt -s globstar extglob nocaseglob`
-
-** ** recursive:**
-`ls **/*.py` → finds all Python files in subdirs
-
-** extglob patterns:**
-- `!(pattern)` → not match
-- `*(pattern)` → zero or more
-- `+(pattern)` → one or more
-
-Example: `ls !(*.bak)` → all except .bak
-
----
-
-## Safety checks
-**Before delete:**
-```bash
-echo rm *.tmp
-# shows what would be deleted
-rm *.tmp
-```
-
-**Count matches:**
-```bash
-ls *.log | wc -l
-```
-
-**With spaces:**
-```bash
-for f in *.txt; do echo "$f"; done
-```
-Always quote "$f"
+## Safety
+`echo rm *` → test
+`ls *.tmp` → preview
+`ls .*` → hidden files
