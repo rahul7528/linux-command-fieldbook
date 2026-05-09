@@ -157,4 +157,4 @@ All settings are in /etc. If you want to change SSH port, you edit the SSH confi
 Learn these five and you can work on any Linux server.
 
 ---
-Next: 01-pwd-cd-ls - how to move around these folders
+Next: 01-pwd-cd-ls - how to move around these folders without mouse
