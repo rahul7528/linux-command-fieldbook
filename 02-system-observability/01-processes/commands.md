@@ -1,61 +1,94 @@
-# Boot and Systemd - Quick Reference
+# Processes - Quick Reference
 
-## Service Control
-systemctl status <unit> -l --no-pager
-systemctl start|stop|restart|reload <unit>
-systemctl enable --now <unit>
-systemctl disable --now <unit>
-systemctl is-active <unit>
-systemctl is-enabled <unit>
-systemctl --failed
-systemctl list-units -t service --state=running
-systemctl list-dependencies <unit>
-systemctl cat <unit>
-systemctl edit <unit>
-systemctl daemon-reload
-systemctl reset-failed
+## Snapshot
+ps aux
+ps -ef
+ps -eo pid,ppid,%cpu,%mem,cmd --sort=-%cpu | head
+ps -eo pid,%mem,rss,cmd --sort=-%mem | head
+ps -C nginx -o pid,user,cmd
+ps -p 1234 -Lf
+ps aux | awk '$8 ~ /^Z/'
+ps -ef --forest
 ---
-## Logs
-journalctl -u <unit> -f
-journalctl -u <unit> --since "1 hour ago"
-journalctl -p err -b
-journalctl -b -1
-journalctl -k -f
-journalctl --since today -o short-iso
-journalctl _PID=1234
-journalctl -u <unit> -n 100 --no-pager
-journalctl --disk-usage
-sudo journalctl --vacuum-time=7d
-sudo journalctl --vacuum-size=500M
+## Live Monitoring
+top
+top -b -n1 -o %CPU | head -20
+top -p 1234,5678
+htop
+atop
+atop -r /var/log/atop/atop_20260513
 ---
-## Boot Analysis
-systemd-analyze
-systemd-analyze blame
-systemd-analyze critical-chain
-systemd-analyze plot > boot.svg
-systemd-analyze security <unit>
+## Find and Kill
+pgrep -f "pattern"
+pgrep -u www-data -x nginx
+pgrep -n nginx
+pidof nginx
+pkill -f "celery worker"
+pkill -TERM myapp; sleep 10; pkill -KILL myapp
+kill -0 1234
+kill -HUP $(cat /var/run/nginx.pid)
+kill -TERM -1234
+killall -u deploy node
+kill -STOP 1234; kill -CONT 1234
 ---
-## System State
-hostnamectl status
-hostnamectl set-hostname <name>
-timedatectl status
-timedatectl set-timezone <zone>
-timedatectl set-ntp true
-uptime -p
-w
-who
-last reboot
-last -x
-lastb
+## Hierarchy
+pstree -p
+pstree -s 1234
+pstree -u
 ---
-## Kernel and Power
-dmesg -T
-dmesg -w
-dmesg -l err,warn
-sudo shutdown -r +5 "message"
-sudo shutdown -c
-systemctl reboot
-systemctl poweroff
-systemctl isolate rescue.target
-systemctl get-default
-systemctl set-default multi-user.target
+## Open Files and Ports
+lsof -i :3000
+lsof -iTCP -sTCP:LISTEN
+lsof -p 1234
+lsof +L1
+lsof -u www-data
+lsof -i -P -n
+fuser -v 8080/tcp
+fuser -k 8080/tcp
+---
+## Tracing
+strace -p 1234
+strace -f -e trace=open,connect -p 1234
+strace -c -p 1234
+strace -o /tmp/trace.log -f command
+ltrace -p 1234
+---
+## /proc Inspection
+cat /proc/1234/cmdline | tr '\0' ' '
+cat /proc/1234/environ | tr '\0' '\n'
+ls -l /proc/1234/fd
+cat /proc/1234/status
+cat /proc/1234/limits
+cat /proc/1234/maps
+---
+## Priority
+nice -n 19 backup.sh
+renice +10 -p 1234
+renice -n -5 -u www-data
+ionice -c2 -n7 -p 1234
+taskset -cp 0-3 1234
+---
+## Metrics
+pidstat -u 2
+pidstat -r -p 1234 1
+pidstat -d 1
+pidstat -t -p 1234 1
+vmstat 1
+---
+## Zombies and State
+ps -eo pid,ppid,stat,cmd | awk '$3 ~ /^Z/'
+ps -o ppid= -p <zombie>
+kill -HUP <parent_pid>
+---
+## Job Control
+nohup ./script.sh > /tmp/out.log 2>&1 &
+disown %1
+timeout 300 command
+watch -n1 'ps aux | grep nginx'
+---
+## OOM and Load
+dmesg -T | grep -i "out of memory"
+journalctl -k -p err | grep -i kill
+cat /proc/1234/oom_score
+uptime
+nproc

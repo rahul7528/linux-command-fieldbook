@@ -1,227 +1,345 @@
-# Boot and Systemd
+# Processes
 
-Production control of services, boot sequence, and system state on systemd-based Linux.
+Production process inspection, control, and debugging. Find CPU hogs, kill safely, trace syscalls, and understand process state.
 
-## systemctl — Service Control
+## ps — Process Snapshot
 
-Core command for interacting with systemd.
-
-### Syntax
-```bash
-systemctl status <unit>
-systemctl start|stop|restart|reload <unit>
-systemctl enable|disable <unit>
-systemctl is-active|is-enabled <unit>
-```
-
-### Common Flags
-- `--no-pager`: avoid less, good for scripts
-- `--failed`: list only failed units
-- `-l`: full output, no truncation
-- `-t service`: filter by type
-- `--now`: enable and start in one step
-- `--user`: operate on user services
-
-### Real-world Examples
-```bash
-# Check why nginx won't start
-systemctl status nginx -l --no-pager
-
-# Enable and start immediately
-systemctl enable --now docker
-
-# List all failed services
-systemctl --failed
-
-# Show dependencies
-systemctl list-dependencies sshd.service
-
-# View unit file location and overrides
-systemctl cat nginx.service
-
-# Edit override safely (creates /etc/systemd/system/nginx.service.d/override.conf)
-systemctl edit nginx.service
-
-# Check if service is running in script
-systemctl is-active --quiet postgresql && echo "up"
-```
-
-### Gotchas
-- `restart` kills and starts; `reload` keeps PID if supported. Use reload for nginx, haproxy.
-- `enable` does not start. Use `--now`.
-- Editing unit files directly in /lib/systemd is overwritten on updates. Always use `systemctl edit`.
-
-## journalctl — Centralized Logs
-
-Query systemd journal. Replaces tailing /var/log files.
+The foundation. Always use custom formats in production.
 
 ### Syntax
 ```bash
-journalctl -u <unit> [options]
-journalctl -b [boot_id] [options]
+ps aux
+ps -ef
+ps -eo pid,ppid,cmd,%mem,%cpu --sort=-%cpu
 ```
 
 ### Common Flags
-- `-f`: follow live
-- `-n 100`: last N lines
-- `-u <unit>`: filter by service
-- `-p <priority>`: 0=emerg to 7=debug, or err, warning, info
-- `--since "1 hour ago"`, `--until "2026-05-13 10:00"`
-- `-b -1`: previous boot
-- `-k`: kernel messages only (like dmesg)
-- `-o json-pretty`: structured output
-- `_PID=1234`: filter by PID
+- `aux`: BSD style, all users
+- `-ef`: System V style, full format
+- `-eLf`: show threads (LWP)
+- `-o`: custom columns
+- `--sort=-%cpu`: sort descending
+- `-p <pid>`: specific PID
+- `-C <name>`: by command name
+- `--forest`: tree view
 
 ### Real-world Examples
 ```bash
-# Live tail nginx errors
-journalctl -u nginx -p err -f
+# Top 10 CPU consumers with full command
+ps -eo pid,ppid,%cpu,%mem,cmd --sort=-%cpu | head -11
 
-# Everything from last hour
-journalctl --since "1 hour ago" --no-pager
+# Top 10 memory consumers
+ps -eo pid,%mem,rss,cmd --sort=-%mem | head -11
 
-# Previous boot crash investigation
-journalctl -b -1 -p err
+# Find all python processes with args
+ps -C python3 -o pid,user,%cpu,cmd
 
-# Kernel ring buffer since boot
-journalctl -k -b
+# Show process tree for nginx
+ps -ef --forest | grep -A5 nginx
 
-# Service failures with context
-journalctl -u docker.service --since today -o cat
+# Threads for a Java process
+ps -p 1234 -Lf
 
-# Combine units
-journalctl -u nginx -u php-fpm -f
+# Processes older than 7 days
+ps -eo pid,lstart,cmd | awk '$3 < "2026"'
 
-# Disk usage and cleanup
-journalctl --disk-usage
-sudo journalctl --vacuum-time=7d
-sudo journalctl --vacuum-size=500M
+# Zombie check
+ps aux | awk '$8 ~ /^Z/'
 ```
 
 ### Gotchas
-- Journal is binary; use `journalctl`, not grep on files.
-- Persistent storage requires /var/log/journal. Otherwise logs lost on reboot.
-- Time filters accept natural language but use UTC if TZ not set.
+- `ps aux` truncates cmd. Use `ps -ww` for wide output.
+- RSS is in KB, not percentage. Use %MEM for comparison.
+- Without `--sort`, output is arbitrary.
 
-## systemd-analyze — Boot Performance
+## top, htop, atop — Live Monitoring
 
-Find slow boot components.
-
+### top
 ```bash
-# Total boot time
-systemd-analyze
-
-# Slowest units
-systemd-analyze blame
-
-# Critical path
-systemd-analyze critical-chain
-
-# Generate SVG plot
-systemd-analyze plot > /tmp/boot.svg
-
-# Check unit file security
-systemd-analyze security sshd.service
+top
+# Inside top: P=cpu sort, M=mem sort, 1=per-cpu, c=full cmd, k=kill, H=threads
+top -b -n1 -o %CPU | head -20
+top -p 1234,5678
 ```
 
-Real use: server takes 3 minutes to boot. Run `blame`, find `networkd-wait-online.service` at 90s, mask it if not needed.
+### htop (if installed)
+Better UI, tree view with F5, kill with F9, no need for PID lookup.
 
-## hostnamectl / timedatectl — Identity and Time
-
+### atop
+Records history. Critical for post-mortem.
 ```bash
-# Set hostname permanently
-hostnamectl set-hostname prod-web-01
-
-# Check time sync
-timedatectl status
-
-# Enable NTP
-timedatectl set-ntp true
-
-# Set timezone
-timedatectl set-timezone Asia/Kolkata
-
-# List timezones
-timedatectl list-timezones | grep Kolkata
+atop -r /var/log/atop/atop_20260513
+# Press t to advance, m for memory, d for disk
 ```
 
-Gotcha: changing timezone does not change hardware clock. Use UTC on servers.
+Real use: server load spikes at 2am. Use `atop -r` to replay.
 
-## uptime, who, last, w — User and Boot State
+## pgrep, pkill, pidof — Safe Selection
 
-```bash
-# Load and uptime
-uptime -p
-
-# Who is logged in and what they're doing
-w
-
-# Last reboots and logins
-last reboot
-last -x shutdown
-
-# Failed logins
-lastb
-```
-
-## dmesg — Kernel Messages
+Never parse `ps | grep` in scripts.
 
 ```bash
-# Human readable timestamps
-dmesg -T
+# Find PID by name
+pgrep -f "gunicorn: worker"
+pgrep -u www-data nginx
 
-# Follow new messages
-dmesg -w
+# Kill by pattern, safely
+pkill -f "celery worker"           # SIGTERM
+pkill -9 -f "stuck_script.sh"      # SIGKILL
 
-# Errors only
-dmesg -l err,warn
+# Exact match
+pgrep -x sshd
 
-# Since last boot with journalctl preferred
-journalctl -k -b
+# Newest/oldest
+pgrep -n nginx    # newest
+pgrep -o nginx    # oldest
+
+# pidof for binaries
+pidof nginx
 ```
 
-Use for hardware errors, OOM kills, filesystem corruption.
+Flags: `-f` matches full cmdline, `-u` user, `-n` newest, `-c` count only.
 
-## shutdown / reboot — Safe Restarts
+Gotcha: `pkill -f` matches itself. Use `pgrep` first to verify.
+
+## kill, killall — Signals
+
+### Syntax
+```bash
+kill -<signal> <pid>
+killall <name>
+```
+
+### Essential Signals
+- `TERM (15)`: graceful, default
+- `HUP (1)`: reload config
+- `INT (2)`: Ctrl-C
+- `KILL (9)`: force, no cleanup
+- `STOP (19)`: pause, `CONT (18)` resume
+- `0`: test if process exists
+
+### Real-world Examples
+```bash
+# Graceful nginx reload
+kill -HUP $(cat /var/run/nginx.pid)
+
+# Test if PID exists without killing
+kill -0 1234 && echo "alive"
+
+# Kill process group (negative PID)
+kill -TERM -1234
+
+# Kill all node processes for user deploy
+killall -u deploy node
+
+# Graceful then force pattern
+pkill -TERM myapp; sleep 10; pkill -KILL myapp
+
+# Stop/continue for debugging
+kill -STOP 1234
+# ... inspect ...
+kill -CONT 1234
+```
+
+Safety: never start with `-9`. It leaves sockets, lock files, and corrupts data. Always try TERM, then INT, then KILL.
+
+## pstree — Hierarchy
 
 ```bash
-# Schedule reboot in 5 minutes with message
-sudo shutdown -r +5 "Kernel update"
-
-# Cancel
-sudo shutdown -c
-
-# Immediate reboot
-sudo systemctl reboot
-
-# Poweroff
-sudo systemctl poweroff
+pstree -p
+pstree -p 1
+pstree -s 1234    # show parents
+pstree -u          # show user
 ```
 
-Safety: always use `shutdown -r +1` on remote systems to allow cancel. Never `reboot -f` unless hung.
+Use to find parent of zombie processes.
 
-## Targets — Runlevels
+## lsof and fuser — Open Files and Ports
+
+### lsof
+```bash
+# What's using port 3000
+lsof -i :3000
+lsof -iTCP -sTCP:LISTEN
+
+# Files opened by process
+lsof -p 1234
+
+# Deleted files holding disk space
+lsof +L1
+
+# Network connections by process
+lsof -i -P -n | grep ESTABLISHED
+
+# User's open files
+lsof -u www-data
+```
+
+### fuser
+```bash
+# Kill everything using port 8080
+fuser -k 8080/tcp
+
+# Show PIDs using /var/log
+fuser -v /var/log
+```
+
+Real use: `df` shows disk full but `du` doesn't. Run `lsof +L1`, find deleted log held by java, restart service.
+
+## strace, ltrace — System Call Tracing
+
+Use for "why is it hanging" without restarting.
 
 ```bash
-# Current target
-systemctl get-default
+# Trace opens and network
+strace -e trace=open,connect -p 1234
 
-# List targets
-systemctl list-units --type=target
+# Follow forks
+strace -f -p 1234
 
-# Switch to rescue (single-user)
-sudo systemctl isolate rescue.target
+# Count time per syscall
+strace -c -p 1234
 
-# Set default to multi-user (no GUI)
-sudo systemctl set-default multi-user.target
+# Trace new process
+strace -o /tmp/trace.log nginx -t
+
+# ltrace for library calls
+ltrace -p 1234
 ```
+
+Flags: `-p` attach, `-f` follow children, `-e` filter, `-c` summary, `-tt` timestamps.
+
+Gotcha: high overhead. Don't strace production database under load. Use for short samples.
+
+## /proc — Instant Inspection
+
+No tools needed, just cat.
+
+```bash
+# Command line
+cat /proc/1234/cmdline | tr '\0' ' '
+
+# Environment
+cat /proc/1234/environ | tr '\0' '\n'
+
+# Open file descriptors
+ls -l /proc/1234/fd
+
+# Memory map
+cat /proc/1234/maps
+
+# Current status
+cat /proc/1234/status | grep -E "State|VmRSS|Threads"
+
+# Limits
+cat /proc/1234/limits
+
+# Parent/children
+cat /proc/1234/stat
+```
+
+Real use: process won't die, check `/proc/1234/status` for State: D (uninterruptible IO).
+
+## nice, renice, ionice, taskset — Priority
+
+```bash
+# Start with low priority
+nice -n 19 backup.sh
+
+# Change running process
+renice +10 -p 1234
+renice -n -5 -u www-data
+
+# IO priority (best-effort class 2, priority 7 lowest)
+ionice -c2 -n7 -p 1234
+
+# CPU affinity
+taskset -cp 0-3 1234
+taskset -c 0,2 myapp
+```
+
+Range: nice -20 (highest) to 19 (lowest). Only root can set negative.
+
+## pidstat — Per-Process Metrics
+
+From sysstat package.
+
+```bash
+# CPU per process every 2 seconds
+pidstat -u 2
+
+# Memory
+pidstat -r -p 1234 1
+
+# IO
+pidstat -d 1
+
+# Threads
+pidstat -t -p 1234 1
+```
+
+Better than top for logging to file.
+
+## Zombies, Orphans, D State
+
+- **Z (zombie/defunct)**: child exited, parent didn't wait. Find parent: `ps -o ppid= -p <zombie>`, then restart parent.
+- **D (uninterruptible)**: usually IO wait. Cannot kill with -9. Check `dmesg` for storage issues.
+- **Orphan**: parent died, adopted by PID 1.
+
+```bash
+# Find zombies
+ps -eo pid,ppid,stat,cmd | awk '$3 ~ /^Z/'
+
+# Kill parent to clean zombies
+kill -HUP $(ps -o ppid= -p <zombie_pid>)
+```
+
+## nohup, disown, timeout, watch — Job Control
+
+```bash
+# Keep running after logout
+nohup long_job.sh > /tmp/out.log 2>&1 &
+
+# Disown existing job
+./script.sh &
+disown %1
+
+# Run with time limit
+timeout 300 backup.sh
+
+# Watch process count
+watch -n1 'ps aux | grep -c nginx'
+```
+
+## OOM Killer and Load
+
+```bash
+# Check if OOM killed recently
+dmesg -T | grep -i "out of memory"
+journalctl -k -p err | grep -i kill
+
+# OOM score (higher = more likely to kill)
+cat /proc/1234/oom_score
+
+# Adjust (requires root)
+echo -1000 > /proc/1234/oom_score_adj
+
+# Load average interpretation
+uptime
+# 1,5,15 min averages. Compare to CPU cores: load > cores = queuing
+```
+
+Real use: app killed at night. `journalctl -k -b -1 | grep -i oom` shows kernel killed it due to memory leak.
 
 ## What to Remember
 
-- systemctl status -l is first debug step for any service
-- journalctl -u <service> -f replaces tail -f
-- Always use `enable --now` to avoid forgetting to start
-- Use `journalctl -b -1` for previous boot, not guessing log files
-- `systemd-analyze blame` finds boot slowness in seconds
-- Never edit /lib/systemd directly; use `systemctl edit`
-- For remote reboots, schedule with shutdown, not immediate reboot
+- Use `ps -eo pid,%cpu,%mem,cmd --sort=-%cpu` not `ps aux | head`
+- Never `kill -9` first; use TERM then wait then KILL
+- `pgrep -f` replaces fragile grep pipelines
+- `lsof -i :port` finds port users instantly
+- `lsof +L1` solves mystery disk-full issues
+- Zombies mean broken parent, kill parent not zombie
+- D-state processes cannot be killed, fix IO
+- `strace -p` for quick hangs, but low overhead only
+- Check `/proc/<pid>/fd` and `status` before restarting
+- Load average > CPU cores means saturation
