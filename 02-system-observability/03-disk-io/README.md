@@ -1,75 +1,67 @@
 # Disk I/O
 
-Production disk usage, I/O saturation, and performance diagnosis. Find what is filling disks, what process is hammering IO, and why iowait is high.
+Production disk usage, I/O saturation, and performance diagnosis. Your disk is the godown where all chai ingredients are stored.
+
+## Chai Tapri Analogy
+
+- **Disk** = big steel dabbas in godown (atta, sugar, tea leaves)
+- **RAM** = counter where you actually make chai
+- **iowait** = chaiwala standing idle waiting for sugar to arrive from godown
+- **%util** = how busy the godown worker is (100% = can't fetch faster)
+- **await** = time taken to bring one dabba from shelf
+- **IOPS** = number of dabbas fetched per second
 
 ## df, du, inodes — Space Usage
 
-### df
 ```bash
 df -hT
-df -hT -x tmpfs -x devtmpfs
-df -i                    # inodes
+df -i
 ```
 
-Interpretation: Use `-T` for filesystem type. 100% use on `/` stops writes. Check inodes separately — full inodes = "No space left" even with free blocks.
+**Chai view:** `df` shows how full each godown shelf is. `df -i` shows number of small boxes (inodes). You can have empty shelf space but no empty boxes — still can't store.
 
-### du
 ```bash
-du -hxd1 / | sort -hr | head -15
-du -sh /var/log/*
-ncdu /                   # interactive
+du -hxd1 / | sort -hr | head
 ```
 
-Flags: `-x` stay on one filesystem, `-d1` depth 1, `-h` human.
+**Chai view:** Go shelf by shelf, weigh each dabba. `-x` means don't go to other godown.
 
-Real-world:
+Real use:
 ```bash
-# Find top 10 directories on root
-du -x / -d2 2>/dev/null | sort -rn | head
+# Find what's filling root
+du -x / -d1 2>/dev/null | sort -rn | head
 
-# Find files >1GB
+# Find files bigger than 1GB
 find / -xdev -type f -size +1G -exec ls -lh {} \; 2>/dev/null
 ```
 
-Gotcha: `du` vs `df` mismatch means deleted files held open. Use `lsof +L1`.
-
-## lsblk, findmnt, blkid — Devices and Mounts
+## lsblk, findmnt — Devices
 
 ```bash
 lsblk -f
 lsblk -o NAME,SIZE,FSTYPE,MOUNTPOINT,ROTA
-findmnt
-findmnt /var
-blkid
 ```
 
-`ROTA=1` = spinning disk, `0` = SSD/NVMe.
+**Chai view:** `ROTA=1` = old godown with ladder (HDD), slow. `ROTA=0` = modern rack with instant access (SSD/NVMe).
 
 ## iostat — Device Utilization
 
-From sysstat.
-
 ```bash
 iostat -x 1 3
-iostat -xz 1              # ignore zero-activity
-iostat -p sda 1
 ```
 
-Key columns:
-- **%util**: device saturation ( >80% = bottleneck)
-- **await**: average wait ms ( >20ms SSD, >50ms HDD = slow)
-- **avgqu-sz**: queue depth ( >2 = saturated)
-- **r/s w/s**: IOPS
-- **rkB/s wkB/s**: throughput
+**Chai view:**
+- **%util 95%** = godown worker is running non-stop, can't fetch faster
+- **await 80ms** = takes 80ms to bring one dabba (should be <20ms for SSD)
+- **avgqu-sz 10** = 10 people waiting at godown door
+- **r/s w/s** = dabbas read/written per second
 
-Real use:
 ```bash
 # Find saturated disk
-iostat -x 1 | awk '$NF>80'
-
-# Check NVMe latency
-iostat -x nvme0n1 1
+iostat -x 1 | awk '$NF>80 {print $1, "BUSY:", $NF"%"}'
 ```
+
+Real use: MySQL slow. `iostat -x` shows nvme0n1 at 99% util, await 120ms = disk is bottleneck, not CPU.
 
 ## vmstat — IO Wait Context
 
@@ -77,151 +69,132 @@ iostat -x nvme0n1 1
 vmstat 1
 ```
 
-Focus: `bi`/`bo` (blocks in/out), `wa` (CPU iowait %). `wa` > 30% consistently = disk bound.
+**Chai view:** `wa` column = percentage of chaiwalas standing idle waiting for ingredients. `wa` 40% = 40% of staff doing nothing because godown is slow.
 
-## iotop and pidstat -d — Per-Process IO
+## iotop and pidstat -d — Who is Hammering Disk
 
 ```bash
-sudo iotop -oPa          # only processes doing IO, accumulated
-sudo iotop -b -n5
-
-pidstat -d 1 5           # kB_rd/s kB_wr/s
-pidstat -d -p 1234 1
+sudo iotop -oPa
+pidstat -d 1 5
 ```
 
-Real use: MySQL slow. `iotop -o` shows backup script writing 200MB/s to same disk.
+**Chai view:** Instead of blaming godown, find which customer is ordering 100kg sugar at once. `iotop` shows backup script writing 500MB/s.
 
-Flags: `-o` only active, `-P` show processes not threads, `-a` accumulated.
+```bash
+# Only show processes doing IO
+sudo iotop -o
+```
 
 ## dstat — Combined View
 
 ```bash
 dstat -cdngy 1
-dstat --top-io --top-bio
 ```
 
-Shows cpu, disk, net, paging together.
+**Chai view:** One screen shows chaiwalas (cpu), godown traffic (disk), customers arriving (net), and water refills (paging).
 
 ## sar — Historical IO
 
 ```bash
-sar -d 1 3               # per device
-sar -b 1 3               # overall IO
-sar -d -p                # pretty device names
-
-# Yesterday 2pm
-sar -d -f /var/log/sysstat/sa13 -s 14:00:00
+sar -d 1 3
+sar -b 1 3
 ```
+
+**Chai view:** Replay yesterday's footage. See godown was at 100% at 3am during backup.
 
 ## /proc/diskstats — Raw Counters
 
 ```bash
-cat /proc/diskstats
-# Fields: reads completed, reads merged, sectors read, ms reading, writes completed...
+grep sda /proc/diskstats
 ```
 
-Quick check:
-```bash
-grep sda /proc/diskstats | awk '{print "reads:",$4,"writes:",$8}'
-```
+**Chai view:** Direct counter of how many dabbas moved, how long worker spent fetching.
 
 ## lsof +L1 — Deleted Files Holding Space
 
 ```bash
 lsof +L1
-lsof +L1 / | awk '$7 > 1048576'   # >1GB deleted
 ```
 
-Fix: restart the process holding the file, or truncate via `/proc/<pid>/fd`.
+**Chai view:** You threw away dabba but someone is still holding it. `df` shows godown full, `du` shows space free. The dabba is in someone's hand, not on shelf.
 
+Fix without restart:
 ```bash
-# Truncate without restart
 : > /proc/1234/fd/3
 ```
+
+**Chai view:** Empty the dabba while person is holding it, instead of snatching it away.
 
 ## find — Large and Old Files
 
 ```bash
 # Largest files
-find /var -xdev -type f -printf '%s %p\n' | sort -rn | head -20 | numfmt --to=iec
+find /var -xdev -type f -printf '%s %p\n' | sort -rn | head -10 | numfmt --to=iec
 
-# Files not accessed in 90 days
-find /data -atime +90 -ls
-
-# Inode hogs (many small files)
+# Inode hogs
 find /var/spool -xdev -printf '%h\n' | sort | uniq -c | sort -rn | head
 ```
+
+**Chai view:** Find which shelf has thousands of tiny masala packets filling all boxes.
 
 ## ionice — IO Priority
 
 ```bash
-ionice -c3 -p 1234       # idle class for backup
-ionice -c2 -n0 backup.sh # best-effort high priority
-
-ionice -p $$             # check current
+ionice -c3 -p 1234
 ```
 
-Classes: 1=realtime, 2=best-effort (0-7), 3=idle.
+**Chai view:** Class 3 = backup worker waits politely, lets customers go first. Class 2 n0 = VIP customer, gets ingredients immediately.
 
 ## fio — Quick Performance Test
 
-Safe read-only test on /tmp.
-
 ```bash
-# Random read IOPS
-fio --name=test --ioengine=libaio --rw=randread --bs=4k --size=256M --runtime=10 --time_based --direct=1 --filename=/tmp/fiotest
-
-# Sequential write
-fio --name=seq --rw=write --bs=1M --size=512M --direct=1 --filename=/tmp/fiotest2
+fio --name=test --rw=randread --bs=4k --size=256M --runtime=10 --direct=1 --filename=/tmp/fiotest
 ```
 
-Cleanup after. Never run on production data volumes.
+**Chai view:** Test how fast godown worker can fetch small masala packets (4k random) vs big rice bags (1M sequential). Do this in empty corner (/tmp), never in main godown.
 
 ## smartctl — Disk Health
 
 ```bash
-sudo smartctl -a /dev/sda | grep -E "Model|Reallocated|Pending|Temperature"
 sudo smartctl -H /dev/sda
-sudo smartctl -t short /dev/sda
+sudo smartctl -a /dev/sda | grep -E "Reallocated|Pending"
 ```
 
-Watch `Reallocated_Sector_Ct`, `Current_Pending_Sector` > 0 = replace disk.
+**Chai view:** Check if steel dabbas are rusting. `Reallocated_Sector_Ct` >0 = dabba has holes, replace soon.
 
 ## atop — Disk View
 
 ```bash
 atop
-# Press D for disk, then s for sorting
-atop -r /var/log/atop/atop_20260513
+# Press D
 ```
 
-## Mount Options and Performance
+**Chai view:** Shows which chaiwala is spending most time waiting at godown.
+
+## Mount Options
 
 ```bash
 findmnt -o TARGET,OPTIONS /data
-mount -o remount,noatime /data
 ```
 
-`noatime` reduces writes. Check for `barrier=0` (dangerous) on databases.
+**Chai view:** `noatime` = don't write timestamp every time you touch dabba. Saves trips to godown.
 
 ## Inode Exhaustion
 
 ```bash
 df -i /
-find / -xdev -printf '%h\n' | sort | uniq -c | sort -rn | head -5
 ```
 
-Common cause: millions of files in `/var/spool/postfix` or session directory.
+**Chai view:** Godown has space but you ran out of labels for boxes. Common with millions of session files — like having 10 lakh tiny chai cups but no place to write names.
 
 ## What to Remember
 
-- `df -hT` first, then `df -i` — space and inodes are separate
-- `du -x` to stay on one filesystem
-- `iostat -x 1`: watch %util >80 and await >20ms
-- `wa` in vmstat >30% = disk bound, not CPU
-- `lsof +L1` solves df/du mismatch
-- `iotop -oPa` finds the IO hog process instantly
-- Deleted files: restart service or truncate via /proc/<pid>/fd
-- Use `ionice -c3` for backups to avoid impact
-- Check `smartctl -H` monthly for predictive failures
-- NVMe shows as nvme0n1, not sda — use lsblk
+- df -h first, then df -i — space and boxes are different
+- iostat %util >80 = godown saturated
+- await >20ms SSD, >50ms HDD = slow worker
+- wa high = chaiwalas waiting, not CPU problem
+- lsof +L1 solves mystery full disk
+- iotop -o finds who is ordering bulk
+- ionice -c3 for backups
+- NVMe shows as nvme0n1, check ROTA=0
+- Never test fio on production data
