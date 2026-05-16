@@ -1,252 +1,202 @@
 # Memory and CPU
 
-Production observability for memory usage, leaks, swapping, CPU saturation, and load. Diagnose performance issues without guessing.
+Production observability for memory usage, leaks, swapping, CPU saturation, and load. Think of your server as a busy chai tapri.
+
+## Chai Tapri Analogy
+
+- **RAM** = counter space where you make chai. Fast, limited.
+- **CPU cores** = number of chaiwalas working.
+- **Load average** = customers waiting in line.
+- **Cache/buffers** = pre-boiled water and pre-cut ginger — ready to use, but you can clear it if you need space.
+- **Swap** = back storeroom. You can keep cups there, but fetching takes time.
+- **Disk I/O wait** = waiting for milk delivery truck.
 
 ## free and /proc/meminfo — Memory Overview
 
 ### free
 ```bash
 free -h
-free -w -h    # wide, separates buffers and cache
-watch -n1 free -h
+free -w -h
 ```
+
+**Chai view:** `free` shows empty counter space. `available` is real free space including what you can clear (pre-boiled water). Don't panic if `used` is high — Linux keeps water hot.
 
 Interpretation:
-- **available**: memory for new apps without swapping (use this, not free)
-- **used**: includes cache; Linux uses free RAM for cache
-- **buff/cache**: reclaimable
+- **available**: memory for new customers without using storeroom
+- **buff/cache**: pre-boiled water, reclaimable instantly
 
-### /proc/meminfo
 ```bash
-grep -E "MemTotal|MemAvailable|Swap|Dirty|Slab" /proc/meminfo
+grep -E "MemTotal|MemAvailable|Swap" /proc/meminfo
 ```
 
-Real use: alert fires "memory 95%". Check `MemAvailable`, not `MemFree`. If available > 20%, it's cache, not a leak.
+Real use: Alert says 95% memory. Check `MemAvailable`. If 2GB available, it's just hot water, not a leak.
 
 ## vmstat — System-wide Memory and CPU
 
 ```bash
 vmstat 1 5
-vmstat -w 1
-vmstat -s
 ```
 
-Columns:
-- **procs r/b**: runnable / blocked (b > 0 = IO wait)
-- **memory**: swpd, free, buff, cache
-- **swap si/so**: swap in/out per second (so > 0 = swapping)
-- **io bi/bo**: blocks in/out
-- **system in/cs**: interrupts, context switches
-- **cpu us/sy/id/wa/st**: user, system, idle, iowait, steal
+**Chai view:**
+- `r` = customers currently being served
+- `b` = customers blocked waiting for milk (disk)
+- `si/so` = cups moving to/from storeroom (swap in/out). Any `so` > 0 means you're using back room — slow.
+- `wa` = chaiwalas idle waiting for milk delivery
 
-Real-world:
 ```bash
 # Check for swapping
-vmstat 1 | awk '$8>0 || $9>0'
-
-# High iowait
-vmstat 1 | awk '$16>30'
+vmstat 1 | awk '$8>0 || $9>0 {print "SWAPPING:",$8,$9}'
 ```
-
-Gotcha: `wa` high means CPU waiting on disk, not CPU bound.
 
 ## top, htop — Per-Process Memory
 
 ```bash
 top
-# Press M to sort by memory, E to cycle units, H for threads
+# Press M to sort by memory
+```
 
+**Chai view:** See which customer order is taking up the whole counter. One Java process using 8GB = one guy ordered 100 cups.
+
+```bash
 top -b -n1 -o %MEM | head -15
 ```
 
-htop: F6 sort by PERCENT_MEM, shows RES (resident) and VIRT.
-
 ## smem and pmap — Accurate Process Memory
 
-`ps` RSS overcounts shared memory. Use PSS.
+`ps` RSS counts shared ginger twice. PSS is truth.
 
 ```bash
-# Install smem if available
 smem -s pss
-smem -u
-
-# Map of process
 pmap -x 1234
-pmap -X 1234 | tail -1
-
-# Total PSS for process tree
-smem -P nginx -c "pid command pss" -t
 ```
 
-Real use: find memory leak. Run `smem -s pss | tail`, note PID, wait 10m, run again, compare PSS growth.
+**Chai view:** Multiple chaiwalas share same ginger jar. RSS says each has full jar. PSS divides it fairly.
+
+Real use: Find memory leak. Run `smem -P gunicorn`, wait 10 minutes, run again. PSS growing = leak.
 
 ## slabtop — Kernel Memory
 
 ```bash
 slabtop -o | head -20
-cat /proc/meminfo | grep Slab
 ```
 
-High slab unreclaimable = kernel leak or dentry cache bloat. Clear caches (safe, non-destructive):
+**Chai view:** This is memory the kitchen staff (kernel) uses for their own tools — ladles, strainers. If `dentry` cache is huge, kernel is remembering too many file names.
+
+Clear safely:
 ```bash
-sync; echo 2 > /proc/sys/vm/drop_caches  # dentries/inodes only
+sync; echo 2 > /proc/sys/vm/drop_caches  # clear recipe memory only
 ```
 
 ## Swap Analysis
 
 ```bash
 swapon --show
-cat /proc/swaps
-vmstat 1 | awk '{print $8,$9}'  # si so
-
-# Swappiness (0-100, lower = avoid swap)
 cat /proc/sys/vm/swappiness
-sysctl vm.swappiness=10
-
-# What is swapped per process
-for pid in /proc/[0-9]*; do awk '/Swap/{s+=$2} END{print s}' $pid/smaps 2>/dev/null; done | sort -n
 ```
 
-Real use: server swapping despite free RAM. Check swappiness=60 default, lower to 10 for database servers.
+**Chai view:** Swappiness = how eager you are to use storeroom. 60 = normal shop, 10 = premium tapri (avoid storeroom, keep everything on counter). Databases want 10.
+
+```bash
+vmstat 1 | awk '{print $8,$9}'  # si so
+```
+
+If `so` constantly >0, you're serving from storeroom — customers will complain about slow chai.
 
 ## lscpu and /proc/cpuinfo — CPU Topology
 
 ```bash
 lscpu
-lscpu -e
-
-grep -E "model name|cpu cores|siblings" /proc/cpuinfo | head
 nproc
-nproc --all
 ```
 
-Check for hyperthreading: siblings > cpu cores.
+**Chai view:** `nproc` = number of chaiwalas. `lscpu` shows if each has two hands (hyperthreading).
 
 ## uptime and Load Average
 
 ```bash
 uptime
-cat /proc/loadavg
 ```
 
-Three numbers: 1, 5, 15 minute load. Rule: load / cores:
-- < 0.7: underutilized
-- 0.7-1.0: optimal
-- > 1.0: queuing
-- > 5.0: saturated
+**Chai view:** Load 4.5 on 4 cores = 4 chaiwalas, but 4-5 customers waiting. Line is building. Load 12 on 4 cores = crowd outside, chai will be slow.
+
+Rule: load / cores > 1.0 = queuing.
 
 ```bash
-# Cores
-CORES=$(nproc)
-LOAD=$(awk '{print $1}' /proc/loadavg)
-echo "scale=2; $LOAD / $CORES" | bc
+CORES=$(nproc); LOAD=$(awk '{print $1}' /proc/loadavg); echo "scale=2; $LOAD/$CORES" | bc
 ```
 
 ## mpstat — Per-CPU Stats
 
 ```bash
-mpstat -P ALL 1 3
-mpstat 1
+mpstat -P ALL 1
 ```
 
-Columns: %usr, %sys, %iowait, %steal, %idle
+**Chai view:**
+- `%usr` = making chai
+- `%sys` = cleaning counter
+- `%iowait` = waiting for milk
+- `%steal` = landlord took your chaiwala to work elsewhere (cloud noisy neighbor)
+- `%idle` = chaiwala sitting free
 
-Real use: cloud VM with high %steal (>10) = noisy neighbor, resize instance.
+Real use: `%steal` >10% on AWS = move to bigger instance.
 
 ## pidstat — Per-Process CPU and Memory
 
 ```bash
-pidstat -u 1 5      # CPU
-pidstat -r 1 5      # memory faults
-pidstat -w 1        # context switches
-pidstat -t -p 1234 1 # threads
+pidstat -u 1 5
+pidstat -r 1 5
 ```
 
-Flags: `-u` cpu, `-r` memory, `-d` io, `-w` voluntary/involuntary switches.
+**Chai view:** Track which specific order is burning gas. High voluntary switches = chaiwala keeps getting interrupted.
 
 ## sar — Historical Data
 
-Requires sysstat.
-
 ```bash
-sar -u 1 3      # CPU
-sar -r 1 3      # memory
-sar -q 1 3      # load
-sar -B 1 3      # paging
-
-# Yesterday
-sar -r -f /var/log/sysstat/sa13
+sar -r 1 3
+sar -u 1 3
 ```
 
-Real use: investigate 3am spike. `sar -r -f` shows memory dropped, swap increased.
+**Chai view:** Replay yesterday's rush hour. See when counter filled up at 2am.
 
 ## perf top — Hot Functions
 
-Low overhead sampling.
-
 ```bash
 sudo perf top
-sudo perf top -p 1234
-sudo perf top -e cycles -K
 ```
 
-Use to find which function burns CPU without code changes.
+**Chai view:** Instead of watching chaiwalas, watch their hands. See if they're spending time chopping ginger or waiting for water to boil.
 
 ## numastat and NUMA
 
 ```bash
 numastat
-numactl --hardware
-cat /proc/zoneinfo | grep -E "Node|free"
 ```
 
-High `numa_miss` or `foreign` = cross-NUMA memory access, slows database.
+**Chai view:** Two kitchens (NUMA nodes). If chaiwala in kitchen 1 keeps fetching milk from kitchen 2, it's slow. `numa_miss` high = bad layout.
 
 ## PSI — Pressure Stall Information
 
-Modern kernels expose pressure.
-
 ```bash
-cat /proc/pressure/cpu
 cat /proc/pressure/memory
-cat /proc/pressure/io
-
-# Some process stalled 20% of time in last 10s
-grep avg10 /proc/pressure/memory
 ```
 
-Real use: application latency spikes. `memory avg10=35.12` means 35% of time tasks stalled waiting for memory.
+**Chai view:** Real customer pain. `some avg10=35` means 35% of time in last 10 seconds, customers waited because counter was full.
 
-## OOM and Memory Reclaim
+## OOM Killer
 
 ```bash
 dmesg -T | grep -i "oom"
-journalctl -k | grep -i "killed process"
-
-# OOM scores
 ps -eo pid,comm,oom_score --sort=-oom_score | head
-
-# Prevent kill for critical process
-echo -1000 | sudo tee /proc/1234/oom_score_adj
 ```
 
-## vmstat, sysctl Tuning Quick Checks
-
-```bash
-sysctl vm.min_free_kbytes
-sysctl vm.overcommit_memory
-sysctl vm.overcommit_ratio
-```
+**Chai view:** Counter completely full, no space even in storeroom. Manager (kernel) throws out biggest customer (kills process) to save shop.
 
 ## What to Remember
 
-- Use `MemAvailable` from free, not `free` column
-- `si` and `so` in vmstat > 0 means active swapping — fix now
-- `wa` high = IO bound, not CPU; check disk
-- Load average must be compared to core count
-- `steal` > 5% on VM = host contention
-- PSS from smem is truth for process memory, RSS lies with shared libs
-- `slabtop` for kernel memory leaks
-- PSI files give real application stall time
-- Never clear caches with `echo 3` in production unless debugging; use `echo 2`
-- For leaks: smem → pmap → repeat after interval
+- Available > free — check MemAvailable, not free
+- si/so >0 = using storeroom = slow
+- Load / cores >1 = line forming
+- wa high = waiting for milk, not CPU problem
+- PSS from smem is real memory, RSS lies
+- steal >5% = cloud host stealing your chaiwala
+- PSI tells you actual customer waiting time
