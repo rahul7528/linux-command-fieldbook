@@ -5,101 +5,101 @@ Complete tar, gzip, zip commands with outputs.
 ---
 
 ## tar create
-**Command:** `tar -cvf archive.tar folder/`
+**Command:** `tar -cvf archive.tar folder/`<br/>
 **Output:**
 ```
 folder/
 folder/file1.txt
 folder/file2.txt
 ```
-Creates uncompressed archive
+Creates uncompressed archive<br/>
 
-**Verify:** `ls -lh archive.tar`
-
----
-
-## tar extract
-**Command:** `tar -xvf archive.tar`
-**Output:** same file list
-Extracts to current directory
+**Verify:** `ls -lh archive.tar`<br/>
 
 ---
 
-## tar list
-**Command:** `tar -tvf archive.tar`
+## tar extract<br/>
+**Command:** `tar -xvf archive.tar`<br/>
+**Output:** same file list<br/>
+Extracts to current directory<br/>
+<br/>
+---<br/>
+<br/>
+## tar list<br/>
+**Command:** `tar -tvf archive.tar`<br/>
 **Output:**
 ```
 drwxr-xr-x rahul/rahul 0 2024-05-09 12:00 folder/
 -rw-r--r-- rahul/rahul 15 2024-05-09 12:00 folder/file1.txt
 ```
-
----
-
-## tar.gz create
+<br/>
+---<br/>
+<br/>
+## tar.gz create<br/>
 **Command:** `tar -czvf archive.tar.gz folder/`
-**Output:** same list, file is compressed
-**Check size:** `du -h archive.tar.gz`
+**Output:** same list, file is compressed<br/>
+**Check size:** `du -h archive.tar.gz`<br/>
+<br/>
+---<br/>
+<br/>
+## tar.gz extract<br/>
+**Command:** `tar -xzvf archive.tar.gz`<br/>
+**Output:** extracts files<br/>
+<br/>
+**To specific dir:** `tar -xzvf archive.tar.gz -C /tmp`<br/>
+<br/>
+---<br/>
+<br/>
+## tar.bz2<br/>
+**Create:** `tar -cjvf archive.tar.bz2 folder/`<br/>
+**Extract:** `tar -xjvf archive.tar.bz2`<br/>
 
----
-
-## tar.gz extract
-**Command:** `tar -xzvf archive.tar.gz`
-**Output:** extracts files
-
-**To specific dir:** `tar -xzvf archive.tar.gz -C /tmp`
-
----
-
-## tar.bz2
-**Create:** `tar -cjvf archive.tar.bz2 folder/`
-**Extract:** `tar -xjvf archive.tar.bz2`
-
-Smaller than gzip, slower.
-
----
-
+Smaller than gzip, slower.<br/>
+<br/>
+---<br/>
+<br/>
 ## tar.xz
-**Create:** `tar -cJvf archive.tar.xz folder/`
-**Extract:** `tar -xJvf archive.tar.xz`
+**Create:** `tar -cJvf archive.tar.xz folder/`<br/>
+**Extract:** `tar -xJvf archive.tar.xz`<br/>
 
 Best compression.
-
----
-
+<br/>
+---<br/>
+<br/>
 ## zip
-**Create:** `zip -r archive.zip folder/`
+**Create:** `zip -r archive.zip folder/`<br/>
 **Output:**
 ```
 adding: folder/ (stored 0%)
 adding: folder/file1.txt (deflated 20%)
 ```
 
-**Extract:** `unzip archive.zip`
+**Extract:** `unzip archive.zip`<br/>
+<br/>
+**List:** `unzip -l archive.zip`<br/>
+<br/>
+---<br/><br/>
+<br/>
+## gzip<br/>
+**Command:** `gzip file.log`<br/>
+**Result:** file.log.gz created, original deleted<br/>
+**Decompress:** `gunzip file.log.gz`<br/>
 
-**List:** `unzip -l archive.zip`
+**Keep original:** `gzip -k file.log`<br/>
 
----
+**View:** `zcat file.log.gz | head`<br/>
+<br/>
+---<br/><br/>
+<br/>
+## Common patterns<br/>
+**Backup with exclude:**<br/>
+`tar -czvf backup.tar.gz --exclude='*.log' --exclude='node_modules' project/`<br/>
 
-## gzip
-**Command:** `gzip file.log`
-**Result:** file.log.gz created, original deleted
-**Decompress:** `gunzip file.log.gz`
+**Remote backup:**<br/>
+`tar -czf - /data | ssh backup@server "cat > /backup/data.tar.gz"`<br/>
 
-**Keep original:** `gzip -k file.log`
+**Verify:**<br/>
+`tar -tzf backup.tar.gz > /dev/null && echo OK`<br/>
 
-**View:** `zcat file.log.gz | head`
-
----
-
-## Common patterns
-**Backup with exclude:**
-`tar -czvf backup.tar.gz --exclude='*.log' --exclude='node_modules' project/`
-
-**Remote backup:**
-`tar -czf - /data | ssh backup@server "cat > /backup/data.tar.gz"`
-
-**Verify:**
-`tar -tzf backup.tar.gz > /dev/null && echo OK`
-
-**Extract one file:**
-`tar -xzvf backup.tar.gz path/to/file.conf`
+**Extract one file:**<br/>
+`tar -xzvf backup.tar.gz path/to/file.conf`<br/>
