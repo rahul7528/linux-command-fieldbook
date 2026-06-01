@@ -1,5 +1,5 @@
 # Users and Permissions - Quick Reference
-<br/><br/>
+
 ## Users<br/>
 whoami<br/>
 id<br/>
